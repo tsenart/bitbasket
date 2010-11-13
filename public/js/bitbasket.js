@@ -31,6 +31,22 @@ function noop(e) {
   e.preventDefault();
 }
 
+function randomstring(L){
+  var s= '';
+  var randomchar = function() {
+    var n= Math.floor(Math.random()*62);
+    if(n<10) return n; //1-10
+    if(n<36) return String.fromCharCode(n+55); //A-Z
+    return String.fromCharCode(n+61); //a-z
+  }
+  while(s.length< L) s += randomchar();
+  return s;
+}
+
+function truncate(str, len) {
+  return str.substr(0,len);
+}
+
 $(function(){
   if (typeof FileReader == 'undefined' || typeof WebSocket == 'undefined')
     (function() {
@@ -45,8 +61,8 @@ $(function(){
 })
 
 function handleDragAndDrop(dropbox){
-  var steps = ["Drop a file here if you please...",
-               "... in this pulsing area.",
+  var steps = ["",
+               "Here...",
                "Let it go!"]
                
   document.addEventListener('drop', noop, false);
@@ -65,8 +81,15 @@ function handleDragAndDrop(dropbox){
   var drop = function(e){
     noop.apply(this, arguments)
     $('#basket').removeClass();
-    $('body').trigger('uploadfile', [e.dataTransfer.files]);
-    $('#step').text("Awesome!")
+    if([e.dataTransfer.files].length != 1) {
+      $('#step').text("One file at a time please.");
+    }
+    else {
+      var files = e.dataTransfer.files;
+      files[0].coords = {x:e.pageX, y:e.pageY, w:$('#basket').width(), h:$('#basket').height()};
+      $('#step').text("Awesome!")
+      $('body').trigger('uploadfile', [files]);
+    }
     setTimeout(function(){
       $('#step').fadeOut(1000, function(){
         $('#step')
@@ -97,25 +120,36 @@ function wsConnect(wsurl) {
     socket.onmessage = function(res) {
       var data = JSON.parse(res.data)
       var url = 'http://' + document.location.hostname + '/files/';
-      if(data.success && data.name)
-        $("#filelist").append('<li><a target="_blank" href="'+ url + data.bit + '/' + data.name + '">' + data.name +'</a></li>');
+      if(data.success && data.name) {
+        var rand_id = randomstring(5);
+        var fullpath = url + data.bit + '/' + data.name
+        $("#basket").append('<div id="' + rand_id + '" class="bit ' + data.bit + '"><a target="_blank" href="'+ fullpath + '" title="' + data.name + '"><img src="imgs/bit.png">' + truncate(data.name, 6) + '...</a></li>')
+        $('#' + rand_id).css({
+            'left' : (($('#basket').width() - data.coords['w'] - 25) / 2 + data.coords['x']) + 'px',
+            'top' : data.coords['y'] - 25 + 'px'
+        });
+      }
       else if(data.success && !data.name) {
-        $("#filelist li a[href*=" + data.bit + "]").remove();
+        $(".bit a[href*=" + data.bit + "]").remove();
+      }
+      else if(data.success && !data.bit) {
+        $("." + data.bit).remove();
       }
       else
         $('#step').text("Something went wrong...");
     }
   }
   
-  $('body').bind('uploadfile', function(e, files){
+  $('body').bind('uploadfile', function(e, params){
       var reader = new FileReader();
       reader.onloadend = function(e) {
         socket.send(JSON.stringify({
-          name: files[0].name,
-          data: binary.base64Encode(e.target.result)
+          name: params[0].name,
+          data: binary.base64Encode(e.target.result),
+          coords: params[0].coords
         }))
-        console.log("Sent file: " + files[0].name)
+        console.log("Sent file: " + params[0].name)
       }
-      reader.readAsBinaryString(files[0])
+      reader.readAsBinaryString(params[0])
   })
 }
