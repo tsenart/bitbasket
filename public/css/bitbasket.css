@@ -10,7 +10,7 @@ html {
 body {
 	font-family: Neucha, Helvetica, sans-serif;
 	color: #999;
-	min-height: 850px;
+	min-height: 750px;
 	padding: 0em;
 	text-shadow: 1px 1px 1px #000;
 }
@@ -23,6 +23,7 @@ img {
   height: 70%;
   padding-left: 60px;
   padding-right: 60px;
+  text-align: center;
 }
 
 #wrapper {
@@ -55,6 +56,13 @@ img {
   background-image: url(/images/dropnode-medium.png);
   text-indent: -6000px;
 }
+
+#wrapper h3 {
+  font-size: 1.4em;
+  font-weight: normal;
+  color: #0e0e0e;
+}
+
 #wrapper .navlink {
   float: right;
   display: block;
@@ -66,6 +74,13 @@ img {
   background: #eee;
   margin: 10px auto;
   padding: 5px;
+}
+
+#wrapper #logo {
+  background: #fefefe url(../imgs/logo.png) no-repeat top;
+  height: 160px;
+  margin-top: 25px;
+  padding: 20px;
 }
 
 #basket {
@@ -88,9 +103,12 @@ img {
   color: #0e0e0e;
 }
 #basket.above {
-  background-color: #66CC00;
-  border: 4px solid #006600;
+  background-color: #5B9234;
 }
+#basket.above h2 {
+  color: #fefefe;
+}
+
 #basket.around {
   background-color: #99FF66;
   border: 1px solid #006600;
@@ -104,25 +122,4 @@ input#shortenedUrlDisplay {
 }
 #fileListBox {
   display: none;
-}
-#browsers {
-  display: block;
-  width: 564px ;
-  margin-left: auto ;
-  margin-right: auto ;
-  list-style-type: none;
-}
-#browsers li {
-  display: block;
-  width: 128px;
-  float: left;
-  margin-left: 30px;
-  margin-right: 30px;
-  text-align: center;
-}
-#browsers li a {
-  text-decoration: none;
-}
-img {
-  border: none;
 }
