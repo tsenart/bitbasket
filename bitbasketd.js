@@ -5,7 +5,7 @@ var
   http = require('http'),
   fs   = require('fs'),
   mime = require('mime'),
-  io   = require('socket.io'),
+  ws   = require('websocket-server'),
   qs   = require('querystring'),
   uuid = require('uuid'),
   redis = require('redis'),
@@ -14,7 +14,7 @@ var
   WEBROOT = path.join(path.dirname(__filename), 'public'),
   DB = redis.createClient();
 
-var server = http.createServer(function(req, res) {
+var httpServer = http.createServer(function(req, res) {
   var pathname = url.parse(req.url).pathname; 
   if(pathname == '/') pathname = '/index.html';
   var filename = path.join(process.cwd(), 'public', qs.unescape(pathname));
@@ -38,9 +38,11 @@ var server = http.createServer(function(req, res) {
   });
 });
 
-var socket = io.listen(server);
+var server = ws.createServer({
+  server: httpServer
+});
 
-socket.on('connection', function(client) {
+server.on('connection', function(client) {
   var id = uuid.generate();
   client.send(JSON.stringify({uuid: id}));
   DB.keys('*', function(err, keys) {
@@ -65,10 +67,11 @@ socket.on('connection', function(client) {
   });
   
   client.on('message', function(data) {
+    console.log('New message from ' + id);
     var msg = JSON.parse(data);
     if(msg.uuid && msg.file && msg.coords)
       DB.sadd(msg.uuid, JSON.stringify({file: msg.file, coords: msg.coords}));
-    client.broadcast(JSON.stringify({
+    server.broadcast(JSON.stringify({
       uuid: msg.uuid,
       file: {
         name: msg.file.name,
@@ -78,13 +81,17 @@ socket.on('connection', function(client) {
     }));
   });
   
-  client.on('disconnect', function() {
+  client.on('close', function() {
     DB.del(id);
-    client.broadcast(JSON.stringify({
+    server.broadcast(JSON.stringify({
       uuid: id,
       del: true
     }));
   });
 });
+
+server.on('shutdown', function(err){
+  DB.flushdb();
+})
 
 server.listen(PORT);
