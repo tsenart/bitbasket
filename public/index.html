@@ -8,7 +8,7 @@
   <script src="js/underscore.js" type="text/javascript"></script>
 </head>
 <body>
-  <img id="bit" src="imgs/bit.png" title="All your base belongs to us.">
+  <img id="bit" src="imgs/icons/bit.png" title="All your base belongs to us.">
   <canvas id="basket">
     Your browser does not support the canvas tag.
   </canvas>
@@ -16,81 +16,78 @@
     var canvas = document.getElementById('basket');
     var socket = new WebSocket('ws://' + document.location.host);
     var ctx = canvas.getContext('2d');
+    var iconSize = [50, 50]; 
     var step = 15;
     var offset = [0, 0];
     var speed = {38: [0, step, 0], 37: [step, 0, 0], 40: [0, -step, 0], 39: [-step, 0, 0]};
     var bits = [];
-    var bitTexture = document.getElementById('bit');
-    var uuid = '';
+    var defaultIcon = document.getElementById('bit');
+    var uid = '';
     
-    function wipeCanvas() {
-      canvas.width = document.body.clientWidth;
-      canvas.height = window.innerHeight - 30;
+    function wipeCanvas(){
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
     }
     
-    function draw(e) {
-      wipeCanvas();
-      if(e && e.keyCode && _(speed).keys().map(function(m){return parseInt(m)}).indexOf(e.keyCode) > -1)
-        speed[e.keyCode][2] = 1;
+    function updateBits(){
+      _(speed).each(function(v, k){
+        if(v[2] == 1){ // If active add to bits.
+          _(bits).each(function(bit){
+            bit.coords.x += v[0]; // x
+            bit.coords.y += v[1]; // y
+          });
+          
+          offset[0] += v[0]; 
+          offset[1] += v[1];
+        }
         
-      _(bits).each(function(bit){
-        _(speed).chain().select(function(i){ return i[2] == 1 }).each(function(sp){
-          bit.coords.x += sp[0];
-          bit.coords.y += sp[1];
-        });
-        ctx.drawImage(bitTexture, bit.coords.x - 25, bit.coords.y - 25);
-      });
-      _(speed).chain().select(function(i){ return i[2] == 1 }).each(function(sp){
-        offset[0] += sp[0];
-        offset[1] += sp[1];
       });
     }
     
-    function cursorOnBit(e) {
+    function drawCanvas(){
+      _(bits).each(function(bit){
+        var icon = new Image();
+        icon.src = 'imgs/icons/' + bit.file.name.split('.').pop() + '.png';
+        icon.onload = function(e) {
+          var img = icon;
+          if(img.width == 0) img = defaultIcon;
+          ctx.drawImage(img, bit.coords.x - (iconSize[0] / 2), bit.coords.y - (iconSize[1] / 2));
+        }
+      });
+    }
+    
+    function cursorOnBit(e){
       return _(bits).any(function(bit) {
-        return e.x < bit.coords.x + 25  &&
-               e.x > bit.coords.x - 25  &&
-               e.y < bit.coords.y + 25  &&
-               e.y > bit.coords.y - 25;
+        return e.x < bit.coords.x + (iconSize[0] / 2)  &&
+               e.x > bit.coords.x - (iconSize[0] / 2)  &&
+               e.y < bit.coords.y + (iconSize[1] / 2)  &&
+               e.y > bit.coords.y - (iconSize[1] / 2);
       });
     }
     
     function bitOnCursor(e) {
       return _(bits).filter(function(bit) {
-        return e.x < bit.coords.x + 25  &&
-               e.x > bit.coords.x - 25  &&
-               e.y < bit.coords.y + 25  &&
-               e.y > bit.coords.y - 25;
+        return e.x < bit.coords.x + (iconSize[0] / 2)  &&
+               e.x > bit.coords.x - (iconSize[0] / 2)  &&
+               e.y < bit.coords.y + (iconSize[1] / 2)  &&
+               e.y > bit.coords.y - (iconSize[1] / 2);
       });
     }
-    
-    socket.onmessage = function(data) {
-      var msg = JSON.parse(data.data);
-      if(msg.uuid && !msg.coords && !msg.del) uuid = msg.uuid;
-      else {
-        if(msg.coords && msg.uuid != uuid) {
-          msg.coords.x += offset[0];
-          msg.coords.y += offset[1];
-          bits.push(msg);
-        }
-        if(msg.del)
-          bits = _(bits).filter(function(b){ return b.uuid != msg.uuid });
-      }
-      draw();
-    };
      
     function noop(e) {
       e.stopPropagation();
       e.preventDefault();
     }
-        
-    canvas.ondragenter = canvas.ondragover = canvas.ondragexit = noop;
-    document.onkeydown = window.onresize = window.onload = draw;
     
-    document.onkeyup = function(e) {
-      if(_(speed).keys().map(function(m){return parseInt(m)}).indexOf(e.keyCode) > -1)
-        speed[e.keyCode][2] = 0;
+    window.onresize = window.onload = function(e){ wipeCanvas(); drawCanvas(); };   
+    window.onbeforeunload = function(e){
+      socket.send(JSON.stringify({uid:uid, del:true}));
+    }
+    document.onkeydown = function(e){
+      if(speed[e.keyCode]) speed[e.keyCode][2] = 1;
+      updateBits(); wipeCanvas(); drawCanvas(); 
     };
+    document.onkeyup = function(e){ if(speed[e.keyCode]) speed[e.keyCode][2] = 0; };
     
     canvas.onmousemove = function(e) {
       if(cursorOnBit(e))
@@ -100,42 +97,75 @@
     };
     
     canvas.onclick = function(e) {
+      noop.apply(this, arguments);
       if(cursorOnBit(e)) {
         var bit = bitOnCursor(e)[0];
-        document.location = document.location.host + '/' + encodeURIComponent(uuid) + '/' + encodeURIComponent(bit.file.name);
+        document.location.replace('http://' + document.location.host + '/' + encodeURIComponent(bit.uid) + '/' + encodeURIComponent(bit.file.name));
       }
     };
     
+    document.onkeypress = canvas.ondragenter = canvas.ondragover = canvas.ondragexit = noop;
     canvas.ondrop = function(e) {
-      noop.apply(this, arguments);
-      bits.push({uuid: uuid, file: e.dataTransfer.files[0], coords: {x: e.x - 25, y: e.y - 25}});
-      ctx.drawImage(bitTexture, _(bits).last().coords.x - 25, _(bits).last().coords.y - 25);
-      
+      noop.apply(this, arguments);      
+      var dropedfile = e.dataTransfer.files[0];
       var reader = new FileReader();
-      reader.onloadend = function(e) {
+      var bit = {
+        uid: uid,
+        file: {
+          name: dropedfile.name,
+          size: dropedfile.size,
+          type: dropedfile.type,
+        },
+        coords: {x: e.x, y: e.y},
+      };
+      
+      console.log('Droped file at ('+ bit.coords.x +','+ bit.coords.y +')');
+      console.log('Current offset: ('+ offset[0] +','+ offset[1] +')')
+      bits.push(bit);
+      wipeCanvas();
+      drawCanvas();
+            
+      reader.onloadend = function(e) {        
         socket.send(JSON.stringify({
-          uuid: uuid,
+          uid: uid,
           file: {
-            name: _(bits).last().file.name,
-            size: _(bits).last().file.size,
+            name: dropedfile.name,
+            size: dropedfile.size,
+            type: dropedfile.type,
             data: btoa(e.target.result)
           },
-          coords: {
-            x: _(bits).last().coords.x - offset[0],
-            y: _(bits).last().coords.y - offset[1]
-          }
+          coords: {x: bit.coords.x - offset[0], y: bit.coords.y - offset[1]}
         }));
       };
-      reader.readAsBinaryString(_(bits).last().file);
+      reader.readAsBinaryString(dropedfile);
     };
     
-    // window.onbeforeunload = function(e) {
-    //      noop.apply(this, arguments);
-    //      var bitcount = _(bits).filter(function(b){ return b.uuid == uuid }).length;
-    //      if(bitcount > 0) {
-    //        return "If you exit you'll stop sharing " + bitcount + " files. Are you sure?"
-    //      }
-    //    }
+    // NETWORKING
+    socket.onmessage = function(data) {
+      var msg = JSON.parse(data.data);
+      console.log('WS Activity:')
+      msg.length = _(msg).keys().length;
+      if(msg.length == 1 && msg.uid) {
+        uid = msg.uid;
+        console.log('You are a new client with id: ' + uid);
+      }
+      
+      if(msg.length == 3 && msg.coords && msg.file && msg.uid != uid) {
+        msg.coords.x += offset[0];
+        msg.coords.y += offset[1];
+        bits.push(msg);
+        console.log('Got new bit from server:');
+        console.log('  ' + msg.uid);
+        console.log('  ' + msg.file.name);
+      }
+      
+      if(msg.del) {
+        bits = _(bits).filter(function(b){ return b.uid != msg.uid });
+        console.log('Client "' + msg.uid + '" disconnected from server. Removing his bits...');
+      }
+      wipeCanvas();
+      drawCanvas();
+    };
         
   </script>
 </body>
