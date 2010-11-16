@@ -20,20 +20,15 @@
     var defaultIcon = document.getElementById('bit');
     var icons = ['aac', 'default', 'im', 'mpv2', 'tif', 'ac3', 'der', 'inf', 'msi', 'tiff', 'ace', 'dic', 'information', 'music', 'tmp', 'ade', 'divx', 'ini', 'nfo', 'ttf', 'adp', 'diz', 'iso', 'one', 'txt', 'ai', 'dll', 'isp', 'pdd', 'uis', 'aiff', 'doc', 'java', 'pdf', 'upload', 'aspx', 'docx', 'jfif', 'php', 'url', 'au', 'dos', 'jpeg', 'png', 'vcr', 'avi', 'download', 'jpg', 'pps', 'video', 'bak', 'dvd', 'js', 'ppt', 'visited', 'bat', 'dwg', 'key', 'pptx', 'vob', 'bin', 'dwt', 'log', 'print', 'wba', 'bit', 'email', 'm4a', 'psd', 'wma', 'blue-ray', 'emf', 'm4p', 'rar', 'wmv', 'bmp', 'exc', 'mmf', 'rb', 'wpl', 'bup', 'external', 'mmm', 'reg', 'wri', 'cab', 'fav', 'mov', 'rtf', 'wtx', 'cat', 'feed', 'movie', 'safari', 'wzv', 'chm', 'fla', 'mp2', 'scp', 'xls', 'cmd', 'font', 'mp2v', 'search', 'xlsx', 'cross', 'gif', 'mp3', 'sql', 'xml', 'css', 'hlp', 'mp4', 'swf', 'xsl', 'csv', 'html', 'mpe', 'sys', 'zap', 'cue', 'ie7', 'mpeg', 'theme', 'zip', 'dat', 'ifo', 'mpg', 'tick'];
     var iconSize = [50, 50]; 
-    var uid = '';
+    var uid = '';     
     
-    function wipeCanvas(){
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      canvas.clear();
-    }
-    
-    function updateBits(){
+    function moveBits(){
       _(speed).each(function(v, k){
         if(v[2] == 1){ // If active add to bits.
           _(bits).each(function(bit){
             bit.coords.x += v[0]; // x
             bit.coords.y += v[1]; // y
+            bit.icon.translate(v[0], v[1]);
           });
           
           offset[0] += v[0]; 
@@ -44,32 +39,6 @@
     }
     
     function drawCanvas(){
-      _(bits).each(function(bit){
-        var ext = bit.file.name.split('.').pop();
-        if(icons.indexOf(ext) > -1) {
-          canvas.image('imgs/icons/' + ext + '.png', bit.coords.x - (iconSize[0] / 2), bit.coords.y - (iconSize[1] / 2), iconSize[0], iconSize[1]);
-        }
-        else
-          canvas.image(defaultIcon.src, bit.coords.x - (iconSize[0] / 2), bit.coords.y - (iconSize[1] / 2), iconSize[0], iconSize[1]);
-      });      
-    }
-    
-    function cursorOnBit(e){
-      return _(bits).any(function(bit) {
-        return e.x < bit.coords.x + (iconSize[0] / 2)  &&
-               e.x > bit.coords.x - (iconSize[0] / 2)  &&
-               e.y < bit.coords.y + (iconSize[1] / 2)  &&
-               e.y > bit.coords.y - (iconSize[1] / 2);
-      });
-    }
-    
-    function bitOnCursor(e) {
-      return _(bits).filter(function(bit) {
-        return e.x < bit.coords.x + (iconSize[0] / 2)  &&
-               e.x > bit.coords.x - (iconSize[0] / 2)  &&
-               e.y < bit.coords.y + (iconSize[1] / 2)  &&
-               e.y > bit.coords.y - (iconSize[1] / 2);
-      });
     }
      
     function noop(e) {
@@ -78,41 +47,46 @@
     }
     
     window.onload = function(e) {
-      //canvas.path("M16,1.466C7.973,1.466,1.466,7.973,1.466,16c0,8.027,6.507,14.534,14.534,14.534c8.027,0,14.534-6.507,14.534-14.534C30.534,7.973,24.027,1.466,16,1.466z M17.328,24.371h-2.707v-2.596h2.707V24.371zM17.328,19.003v0.858h-2.707v-1.057c0-3.19,3.63-3.696,3.63-5.963c0-1.034-0.924-1.826-2.134-1.826c-1.254,0-2.354,0.924-2.354,0.924l-1.541-1.915c0,0,1.519-1.584,4.137-1.584c2.487,0,4.796,1.54,4.796,4.136C21.156,16.208,17.328,16.627,17.328,19.003z")
+      canvas.path("M16,1.466C7.973,1.466,1.466,7.973,1.466,16c0,8.027,6.507,14.534,14.534,14.534c8.027,0,14.534-6.507,14.534-14.534C30.534,7.973,24.027,1.466,16,1.466z M17.328,24.371h-2.707v-2.596h2.707V24.371zM17.328,19.003v0.858h-2.707v-1.057c0-3.19,3.63-3.696,3.63-5.963c0-1.034-0.924-1.826-2.134-1.826c-1.254,0-2.354,0.924-2.354,0.924l-1.541-1.915c0,0,1.519-1.584,4.137-1.584c2.487,0,4.796,1.54,4.796,4.136C21.156,16.208,17.328,16.627,17.328,19.003z")
     }
     
-    window.onresize = function(e){ wipeCanvas(); drawCanvas(); };   
-    window.onbeforeunload = function(e){
+    window.onresize =  function(e) {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    } 
+    
+    window.onbeforeunload = function(e) {
       socket.send(JSON.stringify({uid:uid, del:true}));
     }
-    document.onkeydown = function(e){
+    
+    document.onkeydown = function(e) {
       if(speed[e.keyCode]) speed[e.keyCode][2] = 1;
-      updateBits(); wipeCanvas(); drawCanvas(); 
+      moveBits();
     };
     document.onkeyup = function(e){ if(speed[e.keyCode]) speed[e.keyCode][2] = 0; };
     
-    document.onmousemove = function(e) {
-      if(cursorOnBit(e))
-        document.body.style.cursor = 'pointer';
-      else
-        document.body.style.cursor = 'default';
-    };
+    // document.onmousemove = function(e) {
+    //      if(cursorOnBit(e))
+    //        document.body.style.cursor = 'pointer';
+    //      else
+    //        document.body.style.cursor = 'default';
+    //    };
     
-    document.onclick = function(e) {
-      noop.apply(this, arguments);
-      if(cursorOnBit(e)) {
-        var bit = bitOnCursor(e)[0];
-        window.open('http://' + document.location.host + '/u/' + encodeURIComponent(bit.uid) + '/' + encodeURIComponent(bit.file.name), 'blank');
-      }
-    };
+    // document.onclick = function(e) {
+    //       noop.apply(this, arguments);
+    //       if(cursorOnBit(e)) {
+    //         var bit = bitOnCursor(e)[0];
+    //         window.open('http://' + document.location.host + '/u/' + encodeURIComponent(bit.uid) + '/' + encodeURIComponent(bit.file.name), 'blank');
+    //       }
+    //     };
     
     document.onkeypress = document.ondragenter = document.ondragover = document.ondragexit = noop;
     document.ondrop = function(e) {
       noop.apply(this, arguments);
-      if(cursorOnBit(e)) {
-        alert('Choose another place! There is pleanty of space...');
-        return false;
-      }
+      //if(cursorOnBit(e)) {
+      //         alert('Choose another place! There is pleanty of space...');
+      //         return false;
+      //       }
       var dropedfile = e.dataTransfer.files[0];
       var reader = new FileReader();
       var bit = {
@@ -123,14 +97,21 @@
           type: dropedfile.type,
         },
         coords: {x: e.x, y: e.y},
+        icon: canvas.image('imgs/icons/' + dropedfile.name.split('.').pop() + '.png',
+              e.x - (iconSize[0] / 2),
+              e.y - (iconSize[1] / 2),
+              iconSize[0],
+              iconSize[1])
       };
+      bit.icon.attr('cursor', 'pointer');
+      bit.icon.attr('href', 'http://' + document.location.host + '/u/' + encodeURIComponent(bit.uid) + '/' + encodeURIComponent(bit.file.name));
+      bit.icon.attr('target', 'blank');
       
       console.log('Droped file at ('+ bit.coords.x +','+ bit.coords.y +')');
       console.log('Current offset: ('+ offset[0] +','+ offset[1] +')')
+      
       bits.push(bit);
-      wipeCanvas();
-      drawCanvas();
-            
+         
       reader.onloadend = function(e) {        
         socket.send(JSON.stringify({
           uid: uid,
@@ -159,6 +140,14 @@
       if(msg.length == 3 && msg.coords && msg.file && msg.uid != uid) {
         msg.coords.x += offset[0];
         msg.coords.y += offset[1];
+        msg.icon = canvas.image('imgs/icons/' + msg.file.name.split('.').pop() + '.png',
+                                msg.coords.x - (iconSize[0] / 2),
+                                msg.coords.y - (iconSize[1] / 2),
+                                iconSize[0],
+                                iconSize[1])
+        msg.icon.attr('cursor', 'pointer');
+        msg.icon.attr('href', 'http://' + document.location.host + '/u/' + encodeURIComponent(msg.uid) + '/' + encodeURIComponent(msg.file.name));
+        msg.icon.attr('target', 'blank');
         bits.push(msg);
         console.log('Got new bit from server:');
         console.log('  ' + msg.uid);
@@ -169,8 +158,6 @@
         bits = _(bits).filter(function(b){ return b.uid != msg.uid });
         console.log('Client "' + msg.uid + '" disconnected from server. Removing his bits...');
       }
-      wipeCanvas();
-      drawCanvas();
     };
         
   </script>
