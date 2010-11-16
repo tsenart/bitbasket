@@ -1,18 +1,13 @@
 var
   sys  = require('sys'),
   path = require('path'),
-  url  = require('url'),
   express = require('express'),
-  fs   = require('fs'),
-  mime = require('mime'),
   ws   = require('websocket-server'),
-  qs   = require('querystring'),
   uuid = require('uuid'),
   redis = require('redis'),
-  atob = require('base64').decode,
   _    = require('underscore')._,
       
-  PORT = 3000,
+  PORT = 80,
   WEBROOT = path.join(path.dirname(__filename), 'public'),
   DB = redis.createClient();
 
@@ -20,13 +15,26 @@ var app = express.createServer();
 
 app.configure(function(){
   app.use(express.staticProvider(__dirname + '/public'));
-  app.use(express.errorHandler({ showStack: true, dumpExceptions: true }));
 });
 
-app.get('/:uid/:filename', function(req, res){
+app.get('/u/:uid/*', function(req, res){
   var uid = req.params.uid;
-  var filename = req.params.filename;
-  res.send('There will be content for you soon.');  
+  var filename = req.params.pop();
+  console.log('Served ' + filename);
+  DB.smembers('clients:' + uid + ':files', function(err, data) {
+    if(err || !data)
+      res.send('Not here...', 404);
+    else {
+      var file = _(data).map(function(f){return JSON.parse(f.toString('utf8'))}).filter(function(f){
+        return f.file.name == filename;
+      });
+      if(file && file.length > 0) {
+        res.send(new Buffer(file[0].file.data, 'base64'), { 'Content-Type': file[0].file.type }, 200);
+      }
+      else
+        res.send('Not here...', 404)
+    }
+  });
 });
 
 var server = ws.createServer({
@@ -103,5 +111,4 @@ server.on('connection', function(client) {
 server.on('shutdown', function(err){
   DB.flushdb();
 });
-
 server.listen(PORT);

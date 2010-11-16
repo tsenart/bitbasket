@@ -6,27 +6,26 @@
   <link href="http://fonts.googleapis.com/css?family=Neucha" rel="stylesheet" type="text/css">
   <link href="css/bitbasket.css" rel="stylesheet" type="text/css">
   <script src="js/underscore.js" type="text/javascript"></script>
+  <script src="js/raphael-min.js" type="text/javascript"></script>
 </head>
 <body>
-  <img id="bit" src="imgs/icons/bit.png" title="All your base belongs to us.">
-  <canvas id="basket">
-    Your browser does not support the canvas tag.
-  </canvas>
+  <img id="bit" src="imgs/icons/bit.png">
   <script type="text/javascript">
-    var canvas = document.getElementById('basket');
     var socket = new WebSocket('ws://' + document.location.host);
-    var ctx = canvas.getContext('2d');
-    var iconSize = [50, 50]; 
+    var canvas = Raphael(0, 0, window.innerWidth, window.innerHeight);
     var step = 15;
     var offset = [0, 0];
     var speed = {38: [0, step, 0], 37: [step, 0, 0], 40: [0, -step, 0], 39: [-step, 0, 0]};
     var bits = [];
     var defaultIcon = document.getElementById('bit');
+    var icons = ['aac', 'default', 'im', 'mpv2', 'tif', 'ac3', 'der', 'inf', 'msi', 'tiff', 'ace', 'dic', 'information', 'music', 'tmp', 'ade', 'divx', 'ini', 'nfo', 'ttf', 'adp', 'diz', 'iso', 'one', 'txt', 'ai', 'dll', 'isp', 'pdd', 'uis', 'aiff', 'doc', 'java', 'pdf', 'upload', 'aspx', 'docx', 'jfif', 'php', 'url', 'au', 'dos', 'jpeg', 'png', 'vcr', 'avi', 'download', 'jpg', 'pps', 'video', 'bak', 'dvd', 'js', 'ppt', 'visited', 'bat', 'dwg', 'key', 'pptx', 'vob', 'bin', 'dwt', 'log', 'print', 'wba', 'bit', 'email', 'm4a', 'psd', 'wma', 'blue-ray', 'emf', 'm4p', 'rar', 'wmv', 'bmp', 'exc', 'mmf', 'rb', 'wpl', 'bup', 'external', 'mmm', 'reg', 'wri', 'cab', 'fav', 'mov', 'rtf', 'wtx', 'cat', 'feed', 'movie', 'safari', 'wzv', 'chm', 'fla', 'mp2', 'scp', 'xls', 'cmd', 'font', 'mp2v', 'search', 'xlsx', 'cross', 'gif', 'mp3', 'sql', 'xml', 'css', 'hlp', 'mp4', 'swf', 'xsl', 'csv', 'html', 'mpe', 'sys', 'zap', 'cue', 'ie7', 'mpeg', 'theme', 'zip', 'dat', 'ifo', 'mpg', 'tick'];
+    var iconSize = [50, 50]; 
     var uid = '';
     
     function wipeCanvas(){
-      canvas.width  = window.innerWidth;
+      canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
+      canvas.clear();
     }
     
     function updateBits(){
@@ -46,14 +45,13 @@
     
     function drawCanvas(){
       _(bits).each(function(bit){
-        var icon = new Image();
-        icon.src = 'imgs/icons/' + bit.file.name.split('.').pop() + '.png';
-        icon.onload = function(e) {
-          var img = icon;
-          if(img.width == 0) img = defaultIcon;
-          ctx.drawImage(img, bit.coords.x - (iconSize[0] / 2), bit.coords.y - (iconSize[1] / 2));
+        var ext = bit.file.name.split('.').pop();
+        if(icons.indexOf(ext) > -1) {
+          canvas.image('imgs/icons/' + ext + '.png', bit.coords.x - (iconSize[0] / 2), bit.coords.y - (iconSize[1] / 2), iconSize[0], iconSize[1]);
         }
-      });
+        else
+          canvas.image(defaultIcon.src, bit.coords.x - (iconSize[0] / 2), bit.coords.y - (iconSize[1] / 2), iconSize[0], iconSize[1]);
+      });      
     }
     
     function cursorOnBit(e){
@@ -79,7 +77,11 @@
       e.preventDefault();
     }
     
-    window.onresize = window.onload = function(e){ wipeCanvas(); drawCanvas(); };   
+    window.onload = function(e) {
+      //canvas.path("M16,1.466C7.973,1.466,1.466,7.973,1.466,16c0,8.027,6.507,14.534,14.534,14.534c8.027,0,14.534-6.507,14.534-14.534C30.534,7.973,24.027,1.466,16,1.466z M17.328,24.371h-2.707v-2.596h2.707V24.371zM17.328,19.003v0.858h-2.707v-1.057c0-3.19,3.63-3.696,3.63-5.963c0-1.034-0.924-1.826-2.134-1.826c-1.254,0-2.354,0.924-2.354,0.924l-1.541-1.915c0,0,1.519-1.584,4.137-1.584c2.487,0,4.796,1.54,4.796,4.136C21.156,16.208,17.328,16.627,17.328,19.003z")
+    }
+    
+    window.onresize = function(e){ wipeCanvas(); drawCanvas(); };   
     window.onbeforeunload = function(e){
       socket.send(JSON.stringify({uid:uid, del:true}));
     }
@@ -89,24 +91,28 @@
     };
     document.onkeyup = function(e){ if(speed[e.keyCode]) speed[e.keyCode][2] = 0; };
     
-    canvas.onmousemove = function(e) {
+    document.onmousemove = function(e) {
       if(cursorOnBit(e))
         document.body.style.cursor = 'pointer';
       else
         document.body.style.cursor = 'default';
     };
     
-    canvas.onclick = function(e) {
+    document.onclick = function(e) {
       noop.apply(this, arguments);
       if(cursorOnBit(e)) {
         var bit = bitOnCursor(e)[0];
-        document.location.replace('http://' + document.location.host + '/' + encodeURIComponent(bit.uid) + '/' + encodeURIComponent(bit.file.name));
+        window.open('http://' + document.location.host + '/u/' + encodeURIComponent(bit.uid) + '/' + encodeURIComponent(bit.file.name), 'blank');
       }
     };
     
-    document.onkeypress = canvas.ondragenter = canvas.ondragover = canvas.ondragexit = noop;
-    canvas.ondrop = function(e) {
-      noop.apply(this, arguments);      
+    document.onkeypress = document.ondragenter = document.ondragover = document.ondragexit = noop;
+    document.ondrop = function(e) {
+      noop.apply(this, arguments);
+      if(cursorOnBit(e)) {
+        alert('Choose another place! There is pleanty of space...');
+        return false;
+      }
       var dropedfile = e.dataTransfer.files[0];
       var reader = new FileReader();
       var bit = {

@@ -1,0 +1,3 @@
+MOVE EVERYTHING TO Raphael
+Add Raphael object to Bits.
+add events to those objects like 'onclick'
