@@ -4,6 +4,7 @@ var step = 15;
 var offset = [0, 0];
 var speed = {38: [0, step, 0], 37: [step, 0, 0], 40: [0, -step, 0], 39: [-step, 0, 0]};
 var bits = [];
+var allObjects = canvas.set();
 var iconSize = [50, 50]; 
 var uid = '';     
 
@@ -13,11 +14,10 @@ function moveBits(){
       _(bits).each(function(bit){
         bit.coords.x += v[0]; // x
         bit.coords.y += v[1]; // y
-        bit.icon.hide();
-        bit.icon.translate(v[0], v[1]);
-        bit.icon.show();
       });
-      
+      allObjects.hide();
+      allObjects.translate(v[0], v[1]);
+      allObjects.show();
       offset[0] += v[0]; 
       offset[1] += v[1];
     }
@@ -58,12 +58,21 @@ function getIcon(bit) {
 }
 
 window.onload = function(e) {
-  canvas.path("M16,1.466C7.973,1.466,1.466,7.973,1.466,16c0,8.027,6.507,14.534,14.534,14.534c8.027,0,14.534-6.507,14.534-14.534C30.534,7.973,24.027,1.466,16,1.466z M17.328,24.371h-2.707v-2.596h2.707V24.371zM17.328,19.003v0.858h-2.707v-1.057c0-3.19,3.63-3.696,3.63-5.963c0-1.034-0.924-1.826-2.134-1.826c-1.254,0-2.354,0.924-2.354,0.924l-1.541-1.915c0,0,1.519-1.584,4.137-1.584c2.487,0,4.796,1.54,4.796,4.136C21.156,16.208,17.328,16.627,17.328,19.003z")
+  // var info = canvas.image('imgs/info.png', 0, 0, 35, 35);
+  //  var question = canvas.image('imgs/question.png', 40, 2.5, 30, 30);
+  //  info.attr('cursor', 'pointer'); question.attr('cursor', 'pointer');
+  //  info.attr('title', 'Drop your files here. Anyone connected should see them real time and vice-versa. Use the arrow keys to walk around space.');
+  var txt = canvas.text((canvas.width / 2), 200, "Drop your files here.\nThey will be available instantly on other users browsers.\nIf you run out of space you can use the arrow keys to navigate around for more.");
+  txt.attr('font-size', '17em');
+  txt.attr('font-family', 'Neucha');
+  var me = canvas.circle(canvas.width / 2, canvas.height / 2, iconSize[0] / 2, iconSize[1] / 2);
+  me.attr({fill: '#0e0e0e'});
+  me.attr({title: 'This is you!'});
+  allObjects.push(txt, me);
 }
 
 window.onresize = function() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  canvas.setSize(window.innerWidth, window.innerHeight);
 };
 
 window.onbeforeunload = function(e) {
@@ -103,9 +112,9 @@ document.ondrop = function(e) {
       requester: uid
     }));
   }
-  
-  console.log('Droped file at ('+ bit.coords.x +','+ bit.coords.y +')');
   bits.push(bit);
+  allObjects.push(canvas.create)
+  allObjects.push(bit.icon);
   
   // Coords with offset
   socket.send(JSON.stringify({
@@ -126,7 +135,6 @@ document.ondrop = function(e) {
 // NETWORKING
 socket.onmessage = function(data) {
   var msg = JSON.parse(data.data);
-  console.log('WS Activity:')
   msg.length = _(msg).keys().length;
   if(msg.length == 1 && msg.uid) {
     uid = msg.uid;
@@ -146,8 +154,9 @@ socket.onmessage = function(data) {
         requester: uid
       }));
     }
+    allObjects.push(msg.icon);
     bits.push(msg);
-    console.log('Got new bit from server:');
+    console.log('Got bit from server:');
     console.log('  ' + msg.uid);
     console.log('  ' + msg.file.name);
   }
@@ -159,22 +168,46 @@ socket.onmessage = function(data) {
         name: bit.file.name,
         data: bit.file.data,
         type: bit.file.type,
+        size: bit.file.size
       },
       requester: msg.requester
     }));
     console.log('Sent file "' + bit.file.name + '" to ' + msg.requester)
   }
   
-  if(msg.length == 2 && msg.file && msg.sender) {
+  if(msg.length == 2 && !!msg.file.data && msg.sender) {
     console.log('Receiving ' + msg.file.name + ' from ' + msg.sender);
-    console.log(btoa(msg.file.data));
-    var reader = new FileReader();
-    reader.onloadend = function(e) {
-      console.log('Done reading!')
-      window.open(window.createObjectURL(e.target.result), 'blank');
+    if(false /* For now I can't use the File:Writer API*/) {  
+      window.requestFileSystem(PERSISTENT, msg.file.size, function(fs){
+        fs.root.getDirectory('~/Downloads', {create: true}, function(dwn){
+          dwn.getFile(msg.file.name, {create: true}, function(writer){
+            writer.onwrite = function(e) {
+              console.log('Write completed.');
+            };
+    
+            writer.onerror = function(e) {
+              console.log('Write failed: ' + e);
+            };
+    
+            var bb = new BlobBuilder();
+            bb.append(atob(msg.file.data));
+            writer.write(bb.getBlob(msg.file.type)); 
+          }, function(e){console.log(e.toString())});
+        }, function(e){console.log(e.toString())});
+      }, function(e){console.log(e.toString())});
     }
-    // Check BlobBuilder
-    reader.readAs(msg.file.data);
+    else if(!!window.createObjectURL) {
+      var bb = new BlobBuilder();
+      var reader = new FileReader();
+      bb.append(atob(msg.file.data));
+      reader.onloadend = function(e) {
+        bb = new BlobBuilder();
+        bb.append(e.target.result);
+        var url = window.createObjectURL(bb.getBlob(msg.file.type));
+        window.open(window.createObjectURL(bb.getBlob(msg.file.type)));
+      }
+      reader.readAsText(bb.getBlob(msg.file.type));
+    }
   }
   
   if(msg.del) {
