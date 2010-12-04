@@ -67,10 +67,9 @@ window.onload = function(e) {
   var txt = canvas.text((canvas.width / 2), 200, "Drop your files here.\nThey will be available instantly on other users browsers.\nIf you run out of space you can use the arrow keys to navigate around for more.");
   txt.attr('font-size', '17em');
   txt.attr('font-family', 'Neucha');
-  var me = canvas.circle(canvas.width / 2, canvas.height / 2, iconSize[0] / 2, iconSize[1] / 2);
-  me.attr({fill: '#0e0e0e'});
+  var me = canvas.image('imgs/icons/bit.png', canvas.width / 2 - iconSize[0] / 2, canvas.height / 2, iconSize[0], iconSize[1]);
   me.attr({title: 'This is you!'});
-  allObjects.push(txt, me);
+  allObjects.push(txt);
 }
 
 window.onresize = function() {
