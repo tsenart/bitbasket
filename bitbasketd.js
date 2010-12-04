@@ -1,7 +1,7 @@
 var sys = require('sys'),
     path = require('path'),
     express = require('express'),
-    ws = require('websocket-server'),
+    ws = require('socket.io'),
     uuid = require('uuid'),
     redis = require('redis'),
     _ = require('underscore')._,
@@ -16,6 +16,7 @@ var app = express.createServer();
 app.configure(function() {
     app.use(express.staticProvider(__dirname + '/public'));
 });
+app.listen(PORT);
 
 // app.get('/u/*/*/*', function(req, res) {
 //     var requester = req.params.pop();
@@ -25,9 +26,7 @@ app.configure(function() {
 //     console.log('Served ' + filename);
 // });
 
-var server = ws.createServer({
-    server: app
-});
+var server = ws.listen(app);
 
 server.on('connection', function(client) {
     var id = uuid.generate();
@@ -35,7 +34,7 @@ server.on('connection', function(client) {
     client.send(JSON.stringify({
         uid: id
     }));
-    console.log('Got new client from "' + client._req.connection.remoteAddress + '" called "' + id + '"');
+    console.log('Got new client called "' + id + '"');
     DB.keys('clients:*:files', function(err, data) {
         if (err || !data) return;
         _(data.toString('utf8').split(',')).forEach(function(key) {
@@ -58,7 +57,7 @@ server.on('connection', function(client) {
         });
     });
 
-    client.on('message', function(data) {
+    client.on('message', function(data) {      
         var msg = JSON.parse(data);
         msg.length = _(msg).keys().length;
         
@@ -109,7 +108,7 @@ server.on('connection', function(client) {
     });
     
     // BEGIN CLIENT DISCONNECT
-    client.on('close', function() {
+    client.on('disconnect', function() {
         console.log('Client ' + id + ' disconnected. Deleting his files and broadcasting.');
         delete CLIENTS[id];
         DB.del('clients:' + id + ':files')
@@ -121,8 +120,3 @@ server.on('connection', function(client) {
     // END CLIENT DISCONNECT
     
 });
-
-server.on('shutdown', function(err) {
-    DB.flushdb();
-});
-server.listen(PORT);

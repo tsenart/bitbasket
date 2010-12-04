@@ -1,4 +1,5 @@
-var socket = new WebSocket('ws://' + document.location.host);
+var socket = new io.Socket();
+socket.connect();
 var canvas = Raphael(0, 0, window.innerWidth, window.innerHeight);
 var step = 15;
 var offset = [0, 0];
@@ -133,8 +134,8 @@ document.ondrop = function(e) {
 };
 
 // NETWORKING
-socket.onmessage = function(data) {
-  var msg = JSON.parse(data.data);
+socket.on('message', function(data) {
+  var msg = JSON.parse(data);
   msg.length = _(msg).keys().length;
   if(msg.length == 1 && msg.uid) {
     uid = msg.uid;
@@ -175,7 +176,7 @@ socket.onmessage = function(data) {
     console.log('Sent file "' + bit.file.name + '" to ' + msg.requester)
   }
   
-  if(msg.length == 2 && !!msg.file.data && msg.sender) {
+  if(msg.length == 2 && msg.file && !!msg.file.data && msg.sender) {
     console.log('Receiving ' + msg.file.name + ' from ' + msg.sender);
     if(false /* For now I can't use the File:Writer API*/) {  
       window.requestFileSystem(PERSISTENT, msg.file.size, function(fs){
@@ -217,4 +218,4 @@ socket.onmessage = function(data) {
     bits = _(bits).filter(function(b){return b.uid != msg.uid});
     console.log('Client "' + msg.uid + '" disconnected from server. Removing his bits...');
   }
-};
+});
