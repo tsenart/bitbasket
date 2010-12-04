@@ -198,14 +198,15 @@ socket.on('message', function(data) {
         }, function(e){console.log(e.toString())});
       }, function(e){console.log(e.toString())});
     }
-    else if(!!window.createBlobURL) {
+    else if(!!window.createBlobURL || !!window.createObjectURL) {
       var bb = new BlobBuilder();
       var reader = new FileReader();
+      var url_creator = window.createBlobURL || window.createObjectURL;
       bb.append(atob(msg.file.data));
       reader.onloadend = function(e) {
         bb = new BlobBuilder();
         bb.append(e.target.result);
-        var url = window.createBlobURL(bb.getBlob(msg.file.type));
+        var url = url_creator(bb.getBlob(msg.file.type));
         window.open(url);
       }
       reader.readAsBinaryString(bb.getBlob(msg.file.type));
