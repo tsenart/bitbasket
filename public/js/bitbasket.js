@@ -55,6 +55,7 @@ function getIcon(bit) {
                       iconSize[0],
                       iconSize[1])
   icon.attr('cursor', 'pointer');
+  icon.attr('title', bit.file.name);
   return icon;
 }
 
