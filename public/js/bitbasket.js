@@ -197,17 +197,17 @@ socket.on('message', function(data) {
         }, function(e){console.log(e.toString())});
       }, function(e){console.log(e.toString())});
     }
-    else if(!!window.createObjectURL) {
+    else if(!!window.createBlobURL) {
       var bb = new BlobBuilder();
       var reader = new FileReader();
       bb.append(atob(msg.file.data));
       reader.onloadend = function(e) {
         bb = new BlobBuilder();
         bb.append(e.target.result);
-        var url = window.createObjectURL(bb.getBlob(msg.file.type));
-        window.open(window.createObjectURL(bb.getBlob(msg.file.type)));
+        var url = window.createBlobURL(bb.getBlob(msg.file.type));
+        window.open(url);
       }
-      reader.readAsText(bb.getBlob(msg.file.type));
+      reader.readAsBinaryString(bb.getBlob(msg.file.type));
     }
   }
   
