@@ -7,7 +7,7 @@ var speed = {38: [0, step, 0], 37: [step, 0, 0], 40: [0, -step, 0], 39: [-step, 
 var bits = [];
 var allObjects = canvas.set();
 var iconSize = [50, 50]; 
-var uid = '';     
+var id = '';     
 
 function moveBits(){
   _(speed).each(function(v, k){
@@ -56,6 +56,18 @@ function getIcon(bit) {
                       iconSize[1])
   icon.attr('cursor', 'pointer');
   icon.attr('title', bit.file.name);
+  icon.node.onclick = function(){ 
+    socket.send({
+      op: 'bit',
+      from: id,
+      to: bit.id,
+      bits: {
+        file: {name: bit.file.name}, id: bit.id
+      }
+    });
+  };
+  
+  allObjects.push(icon);
   return icon;
 }
 
@@ -77,7 +89,7 @@ window.onresize = function() {
 };
 
 window.onbeforeunload = function(e) {
-  socket.send(JSON.stringify({uid:uid, del:true}));
+  socket.send({op: 'sync', id: id});
 }
 
 document.onkeydown = function(e) {
@@ -95,7 +107,7 @@ document.ondrop = function(e) {
   var dropedfile = e.dataTransfer.files[0];
   var reader = new FileReader();      
   var bit = {
-    uid: uid,
+    id: id,
     file: {
       name: dropedfile.name,
       size: dropedfile.size,
@@ -104,29 +116,19 @@ document.ondrop = function(e) {
     coords: {x: e.x, y: e.y}
   };
   bit.icon = getIcon(bit);
-  bit.icon.node.onclick = function(e) {
-    socket.send(JSON.stringify({
-      uid: bit.uid,
-      file: {
-        name: bit.file.name
-      },
-      requester: uid
-    }));
-  }
-  bits.push(bit);
-  allObjects.push(canvas.create)
-  allObjects.push(bit.icon);
-  
+  bits.push(bit);  
   // Coords with offset
-  socket.send(JSON.stringify({
-    uid: uid,
-    file: {
-      name: dropedfile.name,
-      size: dropedfile.size,
-      type: dropedfile.type
-    },
-    coords: {x: bit.coords.x - offset[0], y: bit.coords.y - offset[1]}
-  }));  
+  socket.send({
+    op: 'sync',
+    bits: [{
+      file: {
+        name: dropedfile.name,
+        size: dropedfile.size,
+        type: dropedfile.type
+      },
+      coords: {x: bit.coords.x - offset[0], y: bit.coords.y - offset[1]}
+    }]
+  });  
   reader.onloadend = function(e) { 
     bit.file.data = btoa(e.target.result);
   };
@@ -135,88 +137,98 @@ document.ondrop = function(e) {
 
 // NETWORKING
 socket.on('message', function(data) {
-  var msg = JSON.parse(data);
-  msg.length = _(msg).keys().length;
-  if(msg.length == 1 && msg.uid) {
-    uid = msg.uid;
-    console.log('You are a new client with id: ' + uid);
-  }
-  
-  if(msg.length == 3 && msg.coords && msg.file && msg.uid != uid) {
-    msg.coords.x += offset[0];
-    msg.coords.y += offset[1];
-    msg.icon = getIcon(msg);
-    msg.icon.node.onclick = function(e) {
-      socket.send(JSON.stringify({
-        uid: msg.uid,
-        file: {
-          name: msg.file.name
-        },
-        requester: uid
-      }));
+  var msg = data;
+  if(msg.op == 'sync') {
+    if(msg.from) {
+      if(_(bits).filter(function(b){return b.id == id}).length > 0) {
+          console.log('Syncing bits with ' + msg.from);
+          socket.send({
+            op: 'sync',
+            to: msg.from,
+            bits: _(bits).filter(function(b){
+                return b.id == id
+            }).map(function(b){
+                b.icon = null
+                return b
+            })
+          });
+      }
     }
-    allObjects.push(msg.icon);
-    bits.push(msg);
-    console.log('Got bit from server:');
-    console.log('  ' + msg.uid);
-    console.log('  ' + msg.file.name);
+    else {
+      console.log('Syncing bits from broadcast.')
+      if(msg.bits && msg.bits.length > 0)
+          _(msg.bits).each(function(bit){
+            bit.coords.x += offset[0];
+            bit.coords.y += offset[1];
+            bit.icon = getIcon(bit);
+            bits.push(bit);
+          });
+      
+    }
   }
   
-  if(msg.length == 2 && msg.file && msg.requester) {
-    var bit = _(bits).filter(function(b){return b.uid == uid && msg.file.name == b.file.name}).pop();
-    socket.send(JSON.stringify({
-      file: {
-        name: bit.file.name,
-        data: bit.file.data,
-        type: bit.file.type,
-        size: bit.file.size
-      },
-      requester: msg.requester
-    }));
-    console.log('Sent file "' + bit.file.name + '" to ' + msg.requester)
+  if(msg.op == 'del') {
+    _(bits).filter(function(b){return b.id == msg.id}).each(function(bit){
+        bit.icon.remove();
+    });
   }
   
-  if(msg.length == 2 && msg.file && !!msg.file.data && msg.sender) {
-    console.log('Receiving ' + msg.file.name + ' from ' + msg.sender);
-    if(false /* For now I can't use the File:Writer API*/) {  
-      window.requestFileSystem(PERSISTENT, msg.file.size, function(fs){
-        fs.root.getDirectory('~/Downloads', {create: true}, function(dwn){
-          dwn.getFile(msg.file.name, {create: true}, function(writer){
-            writer.onwrite = function(e) {
-              console.log('Write completed.');
-            };
-    
-            writer.onerror = function(e) {
-              console.log('Write failed: ' + e);
-            };
-    
-            var bb = new BlobBuilder();
-            bb.append(atob(msg.file.data));
-            writer.write(bb.getBlob(msg.file.type)); 
+  if(msg.op == 'id') {
+    id = msg.id;
+    console.log('You are a new client with id: ' + id);
+  }
+
+  if(msg.op == 'bit') {
+    if(msg.from) {
+      var bit = _(bits).filter(function(b){return b.id == id && msg.bit.file.name == b.file.name}).pop();
+      socket.send({
+        op: 'bit',
+        to: msg.from,
+        bit: {
+          id: id,
+          file: {
+            data: bit.file.data,
+            type: bit.file.type,
+            size: bit.file.size  
+          }
+        }
+      });
+      console.log('Sent file "' + bit.file.name + '" to ' + msg.from)  
+    }
+    else {
+      console.log('Receiving ' + msg.bit.file.name + ' from ' + msg.id);
+      if(!!window.FileWriter /* For now I can't use the File:Writer API*/) {  
+        window.requestFileSystem(PERSISTENT, msg.file.size, function(fs){
+          fs.root.getDirectory('~/Downloads', {create: true}, function(dwn){
+            dwn.getFile(msg.file.name, {create: true}, function(writer){
+              writer.onwrite = function(e) {
+                console.log('Write completed.');
+              };
+
+              writer.onerror = function(e) {
+                console.log('Write failed: ' + e);
+              };
+
+              var bb = new BlobBuilder();
+              bb.append(atob(msg.file.data));
+              writer.write(bb.getBlob(msg.file.type)); 
+            }, function(e){console.log(e.toString())});
           }, function(e){console.log(e.toString())});
         }, function(e){console.log(e.toString())});
-      }, function(e){console.log(e.toString())});
-    }
-    else if(!!window.createBlobURL || !!window.createObjectURL) {
-      var bb = new BlobBuilder();
-      var reader = new FileReader();
-      var url_creator = window.createBlobURL || window.createObjectURL;
-      bb.append(atob(msg.file.data));
-      reader.onloadend = function(e) {
-        bb = new BlobBuilder();
-        bb.append(e.target.result);
-        var url = url_creator(bb.getBlob(msg.file.type));
-        window.open(url);
       }
-      reader.readAsBinaryString(bb.getBlob(msg.file.type));
+      else if(!!window.createBlobURL || !!window.createObjectURL) {
+        var bb = new BlobBuilder();
+        var reader = new FileReader();
+        var url_creator = window.createBlobURL || window.createObjectURL;
+        bb.append(atob(msg.bit.file.data));
+        reader.onloadend = function(e) {
+          bb = new BlobBuilder();
+          bb.append(e.target.result);
+          var url = url_creator(bb.getBlob(msg.bit.file.type));
+          window.open(url);
+        }
+        reader.readAsBinaryString(bb.getBlob(msg.bit.file.type));
+      }
     }
-  }
-  
-  if(msg.del) {
-    _(bits).chain().filter(function(b){return b.uid == msg.uid}).each(function(bit){
-      bit.icon.remove();
-    });
-    bits = _(bits).filter(function(b){return b.uid != msg.uid});
-    console.log('Client "' + msg.uid + '" disconnected from server. Removing his bits...');
   }
 });

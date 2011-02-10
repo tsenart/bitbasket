@@ -2,84 +2,38 @@ var sys = require('sys'),
     path = require('path'),
     express = require('express'),
     ws = require('socket.io'),
-    uuid = require('uuid'),
-    redis = require('redis'),
     _ = require('underscore')._,
 
     CLIENTS = {},
     PORT = 80,
-    WEBROOT = path.join(path.dirname(__filename), 'public'),
-    DB = redis.createClient();
-
+    WEBROOT = path.join(path.dirname(__filename), 'public');
 var app = express.createServer();
-
 app.configure(function() {
     app.use(express.staticProvider(__dirname + '/public'));
 });
 app.listen(PORT);
 
-// app.get('/u/*/*/*', function(req, res) {
-//     var requester = req.params.pop();
-//     var filename = req.params.pop();
-//     var uid = req.params.pop();
-//     console.log(sys.inspect(CLIENTS));
-//     console.log('Served ' + filename);
-// });
-
 var server = ws.listen(app);
 
 server.on('connection', function(client) {
-    var id = uuid.generate();
+    var id = client.sessionId;
     CLIENTS[id] = client;
-    client.send(JSON.stringify({
-        uid: id
-    }));
+    client.send({ op: 'id', id: id });
     console.log('Got new client called "' + id + '"');
-    DB.keys('clients:*:files', function(err, data) {
-        if (err || !data) return;
-        _(data.toString('utf8').split(',')).forEach(function(key) {
-            DB.smembers(key, function(err, data) {
-                if (err || !data) return;
-                console.log('Broadcasting ' + key + ' ...');
-                _(data).map(function(f) {
-                    return JSON.parse(f.toString('utf8'));
-                }).forEach(function(bit) {
-                    client.send(JSON.stringify({
-                        uid: key.split(':')[1],
-                        file: {
-                            name: bit.file.name,
-                            size: bit.file.size,
-                        },
-                        coords: bit.coords
-                    }));
-                });
-            });
-        });
-    });
-
-    client.on('message', function(data) {      
-        var msg = JSON.parse(data);
-        msg.length = _(msg).keys().length;
+    // Request active bits.
+    client.broadcast({ op: 'sync', from: id });
+    
+    client.on('message', function(data) {
+        var msg = data;
+        
+        if (msg.op == 'sync') {
+          if(msg.to) CLIENTS[msg.to].send({op: 'sync', bits: msg.bits});
+          else client.broadcast({op: 'sync', bits: msg.bits});
+        }
         
         // BEGIN NEW FILE
-        if (msg.length == 3 && msg.uid == id && msg.file && msg.coords) {
-            console.log('Got new bit from "' + msg.uid + '" called "' + msg.file.name + '"');
-            DB.sadd('clients:' + msg.uid + ':files', JSON.stringify({
-                file: {
-                    name: msg.file.name,
-                    size: msg.file.size,
-                },
-                coords: msg.coords
-            }));
-            console.log('Broadcasting...');
-            client.broadcast(JSON.stringify({
-                uid: msg.uid,
-                file: {
-                    name: msg.file.name,
-                    size: msg.file.size,
-                },
-                coords: msg.coords
-            }));
+        if (msg.op == 'bit') {
+            if(msg.to) CLIENTS[msg.to].send({op: 'bit', bit: msg.bit});
         }
         // END NEW FILE
 
@@ -108,15 +62,14 @@ server.on('connection', function(client) {
     });
     
     // BEGIN CLIENT DISCONNECT
-    client.on('disconnect', function() {
-        console.log('Client ' + id + ' disconnected. Deleting his files and broadcasting.');
-        delete CLIENTS[id];
-        DB.del('clients:' + id + ':files')
-        server.broadcast(JSON.stringify({
-            uid: id,
-            del: true
-        }));
-    });
+    // client.on('disconnect', function() {
+    //     console.log('Client ' + id + ' disconnected. Deleting his files and broadcasting.');
+    //     delete CLIENTS[id];
+    //     server.broadcast(JSON.stringify({
+    //         uid: id,
+    //         del: true
+    //     }));
+    // });
     // END CLIENT DISCONNECT
     
 });
