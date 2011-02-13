@@ -5,7 +5,7 @@ var sys = require('sys'),
     _ = require('underscore')._,
 
     CLIENTS = {},
-    PORT = 80,
+    PORT = process.env['app_port'],
     WEBROOT = path.join(path.dirname(__filename), 'public');
 var app = express.createServer();
 app.configure(function() {
