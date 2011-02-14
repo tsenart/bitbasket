@@ -34,26 +34,25 @@ server.on('connection', function(client) {
                 bits: data.bits
             });
         }
+        
+        if (data.op == 'bit') {
+            if (data.to && data.id) server.clients[data.to].send({
+                op: 'bit',
+                id: data.id,
+                from: id
+            });
+            else if (data.to && !data.id) server.clients[data.to].send({
+                op: 'bit',
+                bit: data.bit
+            });
+        }
+        
+        if (data.op == 'id') {
+            client.broadcast({
+                op: 'id',
+                id: data.id
+            })
+        }
 
-        // // BEGIN NEW FILE
-        //  if (data.op == 'bit') {
-        //      server.clients[data.to].send({
-        //          op: 'bit',
-        //          bit: data.bit,
-        //          from: id
-        //      });
-        //  }
-        //  // END NEW FILE
-        //         // BEGIN PROXY FILE TRANSFER
     });
-
-    // BEGIN CLIENT DISCONNECT
-    client.on('disconnect', function() {
-        console.log('Client ' + id + ' disconnected. Deleting his files and broadcasting.');
-        server.broadcast({
-            op: 'id',
-            id: id
-        });
-    });
-    // END CLIENT DISCONNECT
 });

@@ -2,7 +2,6 @@ var noop = function(e) {
     e.stopPropagation();
     e.preventDefault();
 };
-
 var canvas = {
     core: Raphael(0, 0, window.innerWidth, window.innerHeight),
     offset: [0, 0],
@@ -123,7 +122,7 @@ var me = {
             return bit.client == me.id;
         });
     },
-    name: ""
+    name: _.uniqueId('client_')
 };
 
 var socket = new io.Socket();
@@ -139,14 +138,20 @@ window.onload = function(e) {
         title: 'This is you!'
     });
     canvas.all.push(txt);
-    me.name = prompt("What is your nickname?");
 }
 
 window.onresize = function() {
     canvas.core.setSize(window.innerWidth, window.innerHeight);
 };
 
-document.onkeydown = function(e) {
+window.onbeforeunload = function() {
+    socket.send({
+        op: 'id',
+        id: me.id
+    });
+};
+
+document.onkeypress = document.onkeydown = function(e) {
     if (canvas.speed[e.keyCode]) canvas.speed[e.keyCode][2] = 1;
     canvas.move();
 };
@@ -158,23 +163,20 @@ document.onkeypress = document.ondragenter = document.ondragover = document.ondr
 document.ondrop = canvas.drop;
 
 socket.on('message', function(data) {
-    console.log(data);
-
+    console.log(data)
     if (data.op == 'id') {
         if (!me.id)
             me.id = data.id;
         else
-            bits.all = _(bits.all).reject(function(b) {
-                return bits.of(data.id);
-            });   
+            bits.all = _(bits.all).without(bits.of(data.id));
     }
 
     if (data.op == 'sync') {
-        if (data.from) {
+        if (data.from && !data.bits) {
             var tmp = me.bits().map(function(b) {
                 delete b.icon;
+                return b;
             });
-            
             if (tmp.length > 0) {
                 console.log('Syncing bits with ' + data.from);
                 socket.send({
@@ -190,77 +192,48 @@ socket.on('message', function(data) {
         }
     }
 
-
-    // if (data.op == 'bit') {
-    //     if (data.from) {
-    //         var bit = _(bits).filter(function(b) {
-    //             return b.id == id && data.bit.file.name == b.file.name
-    //         }).pop();
-    //         socket.send({
-    //             op: 'bit',
-    //             to: data.from,
-    //             bit: {
-    //                 id: id,
-    //                 file: {
-    //                     data: bit.file.data,
-    //                     type: bit.file.type,
-    //                     size: bit.file.size
-    //                 }
-    //             }
-    //         });
-    //     }
-    //     else {
-    //         console.log('Receiving ' + data.bit.file.name + ' from ' + data.id);
-    //         if ( !! window.FileWriter
-    //         /* For now I can't use the File:Writer API*/
-    //         ) {
-    //             window.requestFileSystem(PERSISTENT, data.file.size,
-    //             function(fs) {
-    //                 fs.root.getDirectory('~/Downloads', {
-    //                     create: true
-    //                 },
-    //                 function(dwn) {
-    //                     dwn.getFile(data.file.name, {
-    //                         create: true
-    //                     },
-    //                     function(writer) {
-    //                         writer.onwrite = function(e) {
-    //                             console.log('Write completed.');
-    //                         };
-    // 
-    //                         writer.onerror = function(e) {
-    //                             console.log('Write failed: ' + e);
-    //                         };
-    // 
-    //                         var bb = new BlobBuilder();
-    //                         bb.append(atob(data.file.data));
-    //                         writer.write(bb.getBlob(data.file.type));
-    //                     },
-    //                     function(e) {
-    //                         console.log(e.toString())
-    //                     });
-    //                 },
-    //                 function(e) {
-    //                     console.log(e.toString())
-    //                 });
-    //             },
-    //             function(e) {
-    //                 console.log(e.toString())
-    //             });
-    //         }
-    //         else if ( !! window.createBlobURL || !!window.createObjectURL) {
-    //             var bb = new BlobBuilder();
-    //             var reader = new FileReader();
-    //             var url_creator = window.createBlobURL || window.createObjectURL;
-    //             bb.append(atob(data.bit.file.data));
-    //             reader.onloadend = function(e) {
-    //                 bb = new BlobBuilder();
-    //                 bb.append(e.target.result);
-    //                 var url = url_creator(bb.getBlob(data.bit.file.type));
-    //                 window.open(url);
-    //             }
-    //             reader.readAsBinaryString(bb.getBlob(data.bit.file.type));
-    //         }
-    //     }
-    // }
+    if (data.op == 'bit') {
+        if (data.from && data.id) {
+            socket.send({
+                op: 'bit',
+                to: data.from,
+                bit: _(bits.all).filter(function(b) {
+                    console.log(b)
+                    console.log(data)
+                    return b.id == data.id;
+                }).pop()
+            });
+        }
+        else {
+            console.log('Receiving ' + data.bit.file.name);
+            if (!!window.requestFileSystem) {
+                window.requestFileSystem(PERSISTENT, data.bit.file.size, function(fs){
+                    fs.root.getFile(data.bit.file.name, {create: true}, function(fileEntry) {
+                        fileEntry.createWriter(function(writer) {
+                            writer.onwrite = function(e) {
+                                console.log("WROTE FILE")
+                                fs.root.getFile(data.bit.file.name, null, function(f) { 
+                                    f.file(function(file) { 
+                                        if (window.webkitURL)  // Chrome 10 & 11 
+                                            var url = window.webkitURL.createObjectURL(file); 
+                                        else // Chrome 9 
+                                            var url = createObjectURL(file); 
+                                      window.open(url); // Assigning the url 
+                                        if (window.webkitURL) // Chrome 10 & 11 
+                                            var url = window.webkitURL.revokeObjectURL(file); 
+                                        else // Chrome 9 
+                                            var url = revokeObjectURL(file); 
+                                    }); 
+                                  });
+                            };  // Success callback function 
+                            writer.onerror = function(e) { console.log("DID NOT WROTE FILE")};  // Error callback function 
+                            var bb = new BlobBuilder(); 
+                            bb.append(atob(data.bit.file.data)); 
+                            writer.write(bb.getBlob(data.bit.file.type)); // The actual writing 
+                        }, function(){console.log("Error")}); 
+                    }, function(e){console.log(e)});
+                });
+            }
+        }
+    }
 });
