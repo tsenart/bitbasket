@@ -163,7 +163,6 @@ document.onkeypress = document.ondragenter = document.ondragover = document.ondr
 document.ondrop = canvas.drop;
 
 socket.on('message', function(data) {
-    console.log(data)
     if (data.op == 'id') {
         if (!me.id)
             me.id = data.id;
@@ -212,7 +211,7 @@ socket.on('message', function(data) {
                         fileEntry.createWriter(function(writer) {
                             writer.onwrite = function(e) {
                                 console.log("WROTE FILE")
-                                fs.root.getFile(data.bit.file.name, null, function(f) { 
+                                fs.root.getFile(data.bit.file.name, null, function(f) {
                                     f.file(function(file) { 
                                         if (window.webkitURL)  // Chrome 10 & 11 
                                             var url = window.webkitURL.createObjectURL(file); 
@@ -229,7 +228,7 @@ socket.on('message', function(data) {
                             writer.onerror = function(e) { console.log("DID NOT WROTE FILE")};  // Error callback function 
                             var bb = new BlobBuilder(); 
                             bb.append(atob(data.bit.file.data)); 
-                            writer.write(bb.getBlob(data.bit.file.type)); // The actual writing 
+                            writer.write(bb.getBlob()); // The actual writing 
                         }, function(){console.log("Error")}); 
                     }, function(e){console.log(e)});
                 });
