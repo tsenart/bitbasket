@@ -26,7 +26,7 @@ var canvas = {
             canvas.all.show();
             canvas.offset[0] += v[0];
             canvas.offset[1] += v[1];
-        });   
+        });
     },
     drop: function(e) {
         noop.apply(this, arguments);
@@ -39,23 +39,46 @@ var canvas = {
             alert('Choose another place! There is pleanty of space...');
             return false;
         }
-        
+
         _(e.dataTransfer.files).each(function(file) {
             var reader = new FileReader();
             reader.onloadend = function(ev) {
                 bits.add(file, e).file.data = btoa(ev.target.result);
+                socket.send({
+                    op: 'sync',
+                    bits: _([bits.all[bits.all.length - 1]]).clone().map(function(b){
+                        b.coords.x -= canvas.offset[0];
+                        b.coords.y -= canvas.offset[1];
+                        delete b.icon;
+                        return b;
+                    })
+                });
             };
             reader.readAsBinaryString(file);
         });
-        
-        socket.send({
-            op: 'sync',
-            bits: me.bits().map(function(b){
-                b.coords.x -= canvas.offset[0];
-                b.coords.y -= canvas.offset[1];
-                return b;
-            })
-        });
+    },
+    icon_for: function() {
+        var icons = ['aac', 'default', 'im', 'mpv2', 'tif', 'ac3', 'der', 'inf', 'msi', 'tiff', 'ace', 'dic', 'information', 'music', 'tmp', 'ade', 'divx', 'ini', 'nfo', 'ttf', 'adp', 'diz', 'iso', 'one', 'txt', 'ai', 'dll', 'isp', 'pdd', 'uis', 'aiff', 'doc', 'java', 'pdf', 'upload', 'aspx', 'docx', 'jfif', 'php', 'url', 'au', 'dos', 'jpeg', 'png', 'vcr', 'avi', 'download', 'jpg', 'pps', 'video', 'bak', 'dvd', 'js', 'ppt', 'visited', 'bat', 'dwg', 'key', 'pptx', 'vob', 'bin', 'dwt', 'log', 'print', 'wba', 'bit', 'email', 'm4a', 'psd', 'wma', 'blue-ray', 'emf', 'm4p', 'rar', 'wmv', 'bmp', 'exc', 'mmf', 'rb', 'wpl', 'bup', 'external', 'mmm', 'reg', 'wri', 'cab', 'fav', 'mov', 'rtf', 'wtx', 'cat', 'feed', 'movie', 'safari', 'wzv', 'chm', 'fla', 'mp2', 'scp', 'xls', 'cmd', 'font', 'mp2v', 'search', 'xlsx', 'cross', 'gif', 'mp3', 'sql', 'xml', 'css', 'hlp', 'mp4', 'swf', 'xsl', 'csv', 'html', 'mpe', 'sys', 'zap', 'cue', 'ie7', 'mpeg', 'theme', 'zip', 'dat', 'ifo', 'mpg', 'tick'];
+        var ico_uri = null;
+        var b = arguments[0];
+        if (!b) return null;
+
+        if (icons.indexOf(b.file.name.split('.').pop()) > -1)
+            ico_uri = 'imgs/icons/' + b.file.name.split('.').pop() + '.png';
+        else
+            ico_uri = 'imgs/icons/default.png';
+        var ico = canvas.core.image(ico_uri, b.coords.x - (canvas.icon_size[0] / 2), b.coords.y - (canvas.icon_size[1] / 2), canvas.icon_size[0], canvas.icon_size[1]);
+        ico.attr('title', b.file.name);
+        ico.attr('cursor', 'pointer');
+        ico.node.onclick = function() {
+            socket.send({
+                op: 'bit',
+                to: b.client,
+                id: b.id
+            });
+        };
+        canvas.all.push(ico);
+        return ico;
     }
 };
 
@@ -65,42 +88,30 @@ var bits = {
     add: function(file, e) {
         if (!me.id) return null;
         var bit = {
-            id: randomUUID(),
+            id: _.uniqueId(me.id + '_'),
             client: me.id,
             file: file,
             coords: {
                 x: e.x,
                 y: e.y
-            },
-            icon: (function() {
-                var icons = ['aac', 'default', 'im', 'mpv2', 'tif', 'ac3', 'der', 'inf', 'msi', 'tiff', 'ace', 'dic', 'information', 'music', 'tmp', 'ade', 'divx', 'ini', 'nfo', 'ttf', 'adp', 'diz', 'iso', 'one', 'txt', 'ai', 'dll', 'isp', 'pdd', 'uis', 'aiff', 'doc', 'java', 'pdf', 'upload', 'aspx', 'docx', 'jfif', 'php', 'url', 'au', 'dos', 'jpeg', 'png', 'vcr', 'avi', 'download', 'jpg', 'pps', 'video', 'bak', 'dvd', 'js', 'ppt', 'visited', 'bat', 'dwg', 'key', 'pptx', 'vob', 'bin', 'dwt', 'log', 'print', 'wba', 'bit', 'email', 'm4a', 'psd', 'wma', 'blue-ray', 'emf', 'm4p', 'rar', 'wmv', 'bmp', 'exc', 'mmf', 'rb', 'wpl', 'bup', 'external', 'mmm', 'reg', 'wri', 'cab', 'fav', 'mov', 'rtf', 'wtx', 'cat', 'feed', 'movie', 'safari', 'wzv', 'chm', 'fla', 'mp2', 'scp', 'xls', 'cmd', 'font', 'mp2v', 'search', 'xlsx', 'cross', 'gif', 'mp3', 'sql', 'xml', 'css', 'hlp', 'mp4', 'swf', 'xsl', 'csv', 'html', 'mpe', 'sys', 'zap', 'cue', 'ie7', 'mpeg', 'theme', 'zip', 'dat', 'ifo', 'mpg', 'tick'];
-                var ico_uri = null;
-
-                if (icons.indexOf(file.name.split('.').pop()) > -1)
-                    ico_uri = 'imgs/icons/' + file.name.split('.').pop() + '.png';
-                else
-                    ico_uri = 'imgs/icons/default.png';
-                var ico = canvas.core.image(ico_uri, e.x - (canvas.icon_size[0] / 2), e.y - (canvas.icon_size[1] / 2), canvas.icon_size[0], canvas.icon_size[1]);
-                ico.attr('title', file.name);
-                ico.attr('cursor', 'pointer');
-                ico.node.onclick = function() {
-                    socket.send({
-                        op: 'bit',
-                        to: bit.client,
-                        id: bit.id
-                    });
-                };
-                console.log(e)
-                canvas.all.push(ico);
-                return ico;
-            })()
+            }
         };
+        bit.icon = canvas.icon_for(bit);
         bits.all.push(bit);
         return bit;
     },
     of: function(client) {
         return _(bits.all).filter(function(b) {
             return b.client == client;
+        });
+    },
+    receive: function() {
+        var new_bits = _.isArray(arguments[0]) ? arguments[0] : [arguments[0]]
+        _(new_bits).each(function(b) {
+            b.coords.x -= canvas.offset[0];
+            b.coords.y -= canvas.offset[1];
+            b.icon = canvas.icon_for(b);
+            bits.all.push(b);
         });
     }
 };
@@ -158,35 +169,26 @@ socket.on('message', function(data) {
             });   
     }
 
-    // if (data.op == 'sync') {
-    //     if (data.from) {
-    //         if (_(bits).filter(function(b) { return b.id == id }).length > 0) {
-    //             console.log('Syncing bits with ' + data.from);
-    //             socket.send({
-    //                 op: 'sync',
-    //                 to: data.from,
-    //                 bits: _(bits).filter(function(b) {
-    //                     return b.id == id
-    //                 }).map(function(b) {
-    //                     b.icon = null
-    //                     return b
-    //                 })
-    //             });
-    //         }
-    //     }
-    //     else {
-    //         console.log('Syncing bits from broadcast.')
-    //         if (data.bits && data.bits.length > 0)
-    //             _(data.bits).each(function(bit) {
-    //                 bit.coords.x -= offset[0];
-    //                 bit.coords.y -= offset[1];
-    //                 bit.icon = getIcon(bit);
-    //                 bit.id = data.
-    //                 bits.push(bit);
-    //             });
-    // 
-    //     }
-    // }
+    if (data.op == 'sync') {
+        if (data.from) {
+            var tmp = me.bits().map(function(b) {
+                delete b.icon;
+            });
+            
+            if (tmp.length > 0) {
+                console.log('Syncing bits with ' + data.from);
+                socket.send({
+                    op: 'sync',
+                    to: data.from,
+                    bits: tmp
+                });
+            }
+        }
+        else {
+            console.log('Syncing bits from broadcast.')
+            if (data.bits.length > 0) bits.receive(data.bits);
+        }
+    }
 
 
     // if (data.op == 'bit') {

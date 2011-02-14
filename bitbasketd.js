@@ -23,15 +23,15 @@ server.on('connection', function(client) {
     });
 
     client.on('message', function(data) {
-        if (data.op && data.op == 'sync') {
+        if (data.op == 'sync') {
             if (data.to) server.clients[data.to].send({
-                op: 'sync',
-                bits: data.bits
-            });
-            else client.broadcast({
                 op: 'sync',
                 bits: data.bits,
                 from: id
+            });
+            else client.broadcast({
+                op: 'sync',
+                bits: data.bits
             });
         }
 
