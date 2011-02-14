@@ -107,8 +107,8 @@ var bits = {
     receive: function() {
         var new_bits = _.isArray(arguments[0]) ? arguments[0] : [arguments[0]]
         _(new_bits).each(function(b) {
-            b.coords.x -= canvas.offset[0];
-            b.coords.y -= canvas.offset[1];
+            b.coords.x += canvas.offset[0];
+            b.coords.y += canvas.offset[1];
             b.icon = canvas.icon_for(b);
             bits.all.push(b);
         });
@@ -130,7 +130,7 @@ var socket = new io.Socket();
 window.onload = function(e) {
     socket.connect();
     canvas.all = canvas.core.set();
-    var txt = canvas.core.text((canvas.core.width / 2), 200, "Drop your files here.\nThey will be available instantly on other users browsers.\nIf you run out of space you can use the arrow keys to navigate around for more.");
+    var txt = canvas.core.text((canvas.core.width / 2), 200, "Drop your files here.\nThey will be available instantly on other users browsers.\nIf you run out of space you can use the arrow keys to navigate around for more.\n Chrome 9+ Only");
     txt.attr('font-size', '17em');
     txt.attr('font-family', 'Neucha');
     var self = canvas.core.image('imgs/icons/bit.png', canvas.core.width / 2 - canvas.icon_size[0] / 2, canvas.core.height / 2, canvas.icon_size[0], canvas.icon_size[1]);
