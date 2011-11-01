@@ -1,2 +1,8 @@
-.DS_Store
 dump.rdb
+.DS_Store
+.sass-cache
+.project
+.DS_Store
+.sass-cache
+.settings
+node_modules
